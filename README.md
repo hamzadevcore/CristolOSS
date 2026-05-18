@@ -56,4 +56,4 @@ Cristol doesn't like doing that.
 * Multi-character tracking
 * More things we probs shouldn't let it do.
 
-“Copyright © Cristol. All rights reserved. No permission is granted to use, copy, modify, or distribute this software.”
+Some AI was used in the programming of Cristol.
