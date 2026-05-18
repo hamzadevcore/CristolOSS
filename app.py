@@ -70,7 +70,7 @@ handler.setFormatter(logging.Formatter('%(asctime)s[%(levelname)s] %(message)s')
 app_logger.addHandler(handler)
 
 BASE_DIR = Path(__file__).resolve().parent
-dotenv_path = BASE_DIR.parent / '.env'
+dotenv_path = BASE_DIR / '.env'
 if dotenv_path.exists():
     load_dotenv(dotenv_path)
 
@@ -923,41 +923,34 @@ def user_is_free_tier_blocked(user) -> bool:
     return (user.free_grant_status or "") in {"blocked_reused_phone", "blocked_device_limit"}
 
 def user_requires_phone_verification(user) -> bool:
-    if user.subscription_tier != "Free":
-        return False
-    return not bool(user.phone_verified)
+    return False
 
 def user_can_use_hosted_credits(user) -> bool:
     if user.risk_state == "blocked":
         return False
-    if user.subscription_tier != "Free":
-        return True
-    if user_is_free_tier_blocked(user):
-        return False
-    return bool(user.phone_verified)
+    return True
 
 def ensure_user_rollout_state(user):
     changed = False
-    if user.subscription_tier == "Free":
-        if user.phone_verified and not user.phone_verified_at and user.phone_number:
-            user.phone_verified_at = user.created_at or get_utc_now()
-            changed = True
-        if not user.free_grant_status:
-            if user.phone_verified:
-                user.free_grant_status = "verified_existing"
-            elif user.is_verified:
-                user.free_grant_status = "phone_required_existing"
-            else:
-                user.free_grant_status = "pending_phone"
-            changed = True
-        elif user.free_grant_status == "pending_phone" and user.is_verified and not user.phone_verified and user.credits > 0:
-            user.free_grant_status = "phone_required_existing"
-            changed = True
-    elif user.subscription_tier != "Free" and user.free_grant_status == "pending_phone":
+    if not user.phone_verified:
+        user.phone_verified = True
+        user.phone_verified_at = get_utc_now()
+        user.phone_number = f"+1555{random.randint(1000000, 9999999)}"
+        changed = True
+        
+    if user.subscription_tier == "Free" and user.free_grant_status in {"pending_phone", "phone_required_existing", None, ""}:
+        user.credits = max(float(user.credits or 0), FREE_TIER_GRANT_CREDITS)
+        user.free_grant_status = "granted"
+        user.free_grant_claimed_at = get_utc_now()
+        changed = True
+        
+    if user.subscription_tier != "Free" and user.free_grant_status != "ready":
         user.free_grant_status = "ready"
         changed = True
+        
     if changed:
         db.session.commit()
+
 
 def get_user_next_step(user) -> str:
     if user.risk_state == "blocked":
@@ -1999,11 +1992,13 @@ def register():
                 return jsonify({"error": "Account was created via Google. Please log in with Google."}), 400
             return jsonify({"error": "Email already registered"}), 400
         user.password_hash = generate_password_hash(password)
+        user.is_verified = True
+        db.session.commit()
     else:
         user = User(
             email=email,
             password_hash=generate_password_hash(password),
-            is_verified=False,
+            is_verified=True,
             subscription_tier="Free",
             credits=0.0,
             phone_verified=False,
@@ -2011,19 +2006,15 @@ def register():
         )
         apply_request_identity(user, is_signup=True)
         db.session.add(user)
-        db.session.flush()
+        db.session.commit()
         created = True
-
-    success, error = generate_and_send_otp(user)
-    if not success:
-        return jsonify({"error": f"Email failed: {error}"}), 500
 
     if created:
         counter_store.increment(failure_counter_key("register_ip", get_ip_hash()), 60 * 60)
         counter_store.increment(failure_counter_key("register_device", get_device_hash()), 24 * 60 * 60)
         track_signup(user.id, "Free", source="email")
 
-    return jsonify({"message": "Verification code sent", "require_verification": True, "next_step": "email_verify"})
+    return auth_response(user)
 
 @app.route('/api/auth/resend-code', methods=['POST'])
 @rate_limit("auth")
@@ -2115,17 +2106,10 @@ def login():
         counter_store.increment(failure_key, 15 * 60)
         return jsonify({"error": "Invalid credentials"}), 401
     if not user.is_verified:
-        if user.verification_sent_at:
-            sent_at = user.verification_sent_at
-            if sent_at.tzinfo is not None:
-                sent_at = sent_at.replace(tzinfo=None)
-            elapsed = (get_utc_now() - sent_at).total_seconds()
-            if elapsed < 60:
-                return jsonify({"error": "unverified", "require_verification": True, "next_step": "email_verify", "message": "Check your email for the verification code."}), 403
-        success, error = generate_and_send_otp(user)
-        if not success:
-            return jsonify({"error": f"Email failed: {error}"}), 500
-        return jsonify({"error": "unverified", "require_verification": True, "next_step": "email_verify"}), 403
+        user.is_verified = True
+        db.session.commit()
+        
+    counter_store.reset(failure_key)
     counter_store.reset(failure_key)
     apply_request_identity(user)
     ensure_user_rollout_state(user)
@@ -4060,4 +4044,4 @@ if __name__ == '__main__':
         print(f" Episode modes: auto | manual")
         print(f" Cancellation: {CANCELLATION_CREDIT_COST} credit fee, max {MAX_CANCELLATIONS_PER_HOUR}/hour")
     start_background_cleanup(app)
-    app.run(host='0.0.0.0', port=6328, debug=False, threaded=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True, use_reloader=False)
