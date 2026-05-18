@@ -57,3 +57,5 @@ Cristol doesn't like doing that.
 * Export/import saves
 * Multi-character tracking
 * More things we probs shouldn't let it do.
+
+“Copyright © Cristol. All rights reserved. No permission is granted to use, copy, modify, or distribute this software.”
