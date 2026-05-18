@@ -26,9 +26,7 @@ Cristol Terminal is built for longform AI storytelling and persistent roleplay w
 
 ## Setup
 
-## TODO
-
-That's it.
+Download and run the ```installer.exe```, and it'll set up the rest! It's that simple!
 
 ---
 
