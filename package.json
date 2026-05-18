@@ -1,0 +1,16 @@
+{
+  "name": "cristol-terminal",
+  "version": "4.2.0",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "wait-on": "^7.2.0"
+  }
+}
