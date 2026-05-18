@@ -9,8 +9,8 @@ import rehypeSanitize from 'rehype-sanitize';
 
 const TEST_MODE = import.meta.env.DEV;
 
-// Automatically route to port 6328 in development to prevent Vite from swallowing the request and returning 404
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:6328/api' : '/api')).replace(/\/$/, '');
+// Automatically route to port 5000 in development to prevent Vite from swallowing the request and returning 404
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api')).replace(/\/$/, '');
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
@@ -97,7 +97,7 @@ export class APIService {
         payload = await r.json();
       } catch {
         const fallbackError = r.status === 404 
-          ? `Backend API Not Found (404). Ensure the Python server is running on port 6328.` 
+          ? `Backend API Not Found (404). Ensure the Python server is running on port 5000.` 
           : r.statusText;
         payload = { error: fallbackError };
       }
